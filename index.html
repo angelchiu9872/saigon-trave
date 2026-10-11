@@ -184,7 +184,6 @@
         const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSDD_1kV87iLrQrjxNVFsjyXmPMhx_H6TxVPY2HXC8yHwIFEQj2Pa8y51LGKpN-hyaZaU3ilgEZ0z3d/pub?gid=882854848&single=true&output=csv";
         let rawData = [];
 
-        // 頁籤切換
         function switchTab(tabName) {
             const formPage = document.getElementById('page-form');
             const overviewPage = document.getElementById('page-overview');
@@ -207,7 +206,6 @@
             }
         }
 
-        // 解析 CSV 格式 (支援引號內含逗號)
         function parseCSV(text) {
             let lines = text.split("\n");
             let result = [];
@@ -233,7 +231,6 @@
             return result;
         }
 
-        // 抓取試算表資料
         async function fetchSheetData(isManual = false) {
             const syncBtn = document.getElementById('sync-btn');
             const syncIcon = document.getElementById('sync-icon');
@@ -246,6 +243,9 @@
 
             try {
                 const response = await fetch(CSV_URL + "&t=" + new Date().getTime());
+                if (!response.ok) {
+                    throw new Error(`HTTP 錯誤！狀態碼: ${response.status}`);
+                }
                 const csvText = await response.text();
                 const parsed = parseCSV(csvText);
 
@@ -270,8 +270,8 @@
                     alert("✅ 試算表資料已強制同步成功！");
                 }
             } catch (error) {
-                console.error("同步失敗:", error);
-                alert("❌ 同步失敗，請檢查網路連線或稍後再試。");
+                console.error("詳細同步錯誤:", error);
+                alert("❌ 同步失敗原因: " + error.message);
             } finally {
                 syncBtn.disabled = false;
                 syncIcon.classList.remove('animate-spin');
@@ -279,7 +279,6 @@
             }
         }
 
-        // 填入下拉選單選項
         function populateDropdowns() {
             const categories = [...new Set(rawData.map(item => item.category))].filter(Boolean);
             const debtors = [...new Set(rawData.map(item => item.debtor))].filter(Boolean);
@@ -290,7 +289,6 @@
             let currentCat = catSelect.value;
             let currentDebtor = debtorSelect.value;
 
-            // 修正處：將 nameMap 改回 map
             catSelect.innerHTML = `<option value="ALL">全選類別 (All Categories)</option>` + 
                 categories.map(c => `<option value="${c}">${c}</option>`).join('');
             debtorSelect.innerHTML = `<option value="ALL">全選應付者 (All Payers)</option>` + 
@@ -300,13 +298,11 @@
             if (debtors.includes(currentDebtor)) debtorSelect.value = currentDebtor;
         }
 
-        // 金額格式化
         function formatNumber(numStr) {
             const num = parseFloat(numStr.replace(/[^0-9.-]+/g,"")) || 0;
             return num.toLocaleString();
         }
 
-        // 篩選與渲染表格
         function filterAndRender() {
             const selectedCategory = document.getElementById('filter-category').value;
             const selectedDebtor = document.getElementById('filter-debtor').value;
