@@ -290,8 +290,9 @@
             let currentCat = catSelect.value;
             let currentDebtor = debtorSelect.value;
 
+            // 修正處：將 nameMap 改回 map
             catSelect.innerHTML = `<option value="ALL">全選類別 (All Categories)</option>` + 
-                categories.nameMap(c => `<option value="${c}">${c}</option>`).join('');
+                categories.map(c => `<option value="${c}">${c}</option>`).join('');
             debtorSelect.innerHTML = `<option value="ALL">全選應付者 (All Payers)</option>` + 
                 debtors.map(d => `<option value="${d}">${d}</option>`).join('');
 
