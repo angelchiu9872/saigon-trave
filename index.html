@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>西貢漫遊 ｜ 旅遊記帳與分帳</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- Google Fonts: Inter & Noto Serif TC -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Serif TC', sans-serif;
+            background-color: #F9F6F0; /* 溫暖米白 */
+            color: #2D3748;
+        }
+        .saigon-yellow { background-color: #DDA832; } /* 胡志明標誌性黃牆色 */
+        .saigon-yellow-text { color: #C68A12; }
+        .saigon-green { background-color: #1B4D3E; } /* 熱帶深綠 */
+        .saigon-green-text { color: #1B4D3E; }
+        .tab-active {
+            border-bottom: 3px solid #1B4D3E;
+            color: #1B4D3E;
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <!-- 頂部導覽列 (Header) -->
+    <header class="saigon-green text-white shadow-md sticky top-0 z-50">
+        <div class="max-w-4xl mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <span class="text-2xl">🇻🇳</span>
+                <div>
+                    <h1 class="text-lg font-bold tracking-wide font-serif">西貢行旅記帳</h1>
+                    <p class="text-xs text-emerald-200">Ho Chi Minh City Trip Splitter</p>
+                </div>
+            </div>
+            <!-- 右上角手動同步按鈕 -->
+            <button id="sync-btn" onclick="fetchSheetData(true)" class="flex items-center space-x-1.5 bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-full text-xs font-semibold shadow transition active:scale-95">
+                <svg id="sync-icon" class="w-4 h-4 animate-spin-slow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+                <span id="sync-text">同步試算表</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- 分頁切換列 (Tabs) -->
+    <nav class="bg-white border-b border-gray-200 sticky top-[57px] z-40 shadow-sm">
+        <div class="max-w-4xl mx-auto flex justify-around">
+            <button onclick="switchTab('form')" id="tab-form" class="flex-1 py-3 text-center text-sm font-medium text-gray-500 hover:text-emerald-900 transition tab-active">
+                📝 快速記帳
+            </button>
+            <button onclick="switchTab('overview')" id="tab-overview" class="flex-1 py-3 text-center text-sm font-medium text-gray-500 hover:text-emerald-900 transition">
+                📊 費用總覽與分帳
+            </button>
+        </div>
+    </nav>
+
+    <!-- 主要內容區塊 -->
+    <main class="flex-1 max-w-4xl w-full mx-auto p-4 mb-16">
+
+        <!-- 頁面 1：記帳頁 (Google Form 嵌入) -->
+        <section id="page-form" class="space-y-4">
+            <div class="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-lg shadow-sm">
+                <div class="flex">
+                    <div class="ml-3">
+                        <p class="text-sm text-amber-800 font-medium">💡 溫馨提示：記帳完畢後，請切換至「費用總覽」點擊右上角【同步試算表】按鈕更新最新數據！</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100 p-1 sm:p-4">
+                <div class="relative w-full overflow-hidden" style="min-height: 850px;">
+                    <iframe src="https://docs.google.com/forms/d/e/1FAIpQLSdLziX4ELHXVsr-UMtdKbsA8ns65kJMDxv_0JFNsClTnYkrZQ/viewform?embedded=true" 
+                            class="absolute top-0 left-0 w-full h-full border-0" 
+                            marginheight="0" marginwidth="0">載入中…</iframe>
+                </div>
+            </div>
+        </section>
+
+        <!-- 頁面 2：總覽頁 (Google Sheet CSV 讀取與計算) -->
+        <section id="page-overview" class="hidden space-y-6">
+            
+            <!-- 狀態卡片區 -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center space-x-4">
+                    <div class="p-3 bg-amber-100 text-amber-700 rounded-lg text-xl">🇻🇳</div>
+                    <div>
+                        <p class="text-xs text-gray-500 font-medium">總消費 (越南盾 VND)</p>
+                        <p id="total-vnd" class="text-lg font-bold text-gray-800">載入中...</p>
+                    </div>
+                </div>
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center space-x-4">
+                    <div class="p-3 bg-emerald-100 text-emerald-700 rounded-lg text-xl">🇹🇼</div>
+                    <div>
+                        <p class="text-xs text-gray-500 font-medium">總消費 (估算台幣 TWD)</p>
+                        <p id="total-twd" class="text-lg font-bold text-gray-800">載入中...</p>
+                    </div>
+                </div>
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center space-x-4">
+                    <div class="p-3 bg-blue-100 text-blue-700 rounded-lg text-xl">🧾</div>
+                    <div>
+                        <p class="text-xs text-gray-500 font-medium">總筆數</p>
+                        <p id="total-count" class="text-lg font-bold text-gray-800">0 筆</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 篩選與分帳計算面板 -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6 space-y-4">
+                <h2 class="text-base font-bold text-gray-800 flex items-center space-x-2 font-serif">
+                    <span>🔍 分帳與類別過濾器</span>
+                </h2>
+                
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">篩選消費類別</label>
+                        <select id="filter-category" onchange="filterAndRender()" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+                            <option value="ALL">全選類別 (All Categories)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">篩選應付者 (檢視個人應付金額)</label>
+                        <select id="filter-debtor" onchange="filterAndRender()" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+                            <option value="ALL">全選應付者 (All Payers)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 篩選後的統計結果 -->
+                <div class="bg-emerald-50 rounded-lg p-4 flex flex-col sm:flex-row justify-between items-center border border-emerald-100">
+                    <div>
+                        <p class="text-xs text-emerald-800 font-medium">符合篩選條件的總金額：</p>
+                        <p id="filtered-total" class="text-xl font-bold text-emerald-900">VND 0 (TWD $0)</p>
+                    </div>
+                    <div class="mt-2 sm:mt-0 text-right">
+                        <p id="sync-time-label" class="text-xs text-gray-400">尚未同步</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 明細列表表格 -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="p-4 border-b border-gray-100 flex justify-between items-center">
+                    <h3 class="font-bold text-gray-800 text-sm font-serif">📋 記帳明細清單</h3>
+                    <span class="text-xs text-gray-400">左右滑動查看完整欄位</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs sm:text-sm">
+                        <thead>
+                            <tr class="bg-gray-50 text-gray-600 border-b border-gray-200">
+                                <th class="p-3 font-semibold">時間</th>
+                                <th class="p-3 font-semibold">越南盾 (VND)</th>
+                                <th class="p-3 font-semibold">台幣 (TWD)</th>
+                                <th class="p-3 font-semibold">類別</th>
+                                <th class="p-3 font-semibold">說明</th>
+                                <th class="p-3 font-semibold">卡別</th>
+                                <th class="p-3 font-semibold">墊付者</th>
+                                <th class="p-3 font-semibold">應付者</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-body" class="divide-y divide-gray-100 text-gray-700">
+                            <tr>
+                                <td colspan="8" class="p-6 text-center text-gray-400">請點擊上方「同步試算表」按鈕載入資料</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </section>
+    </main>
+
+    <!-- 頁尾 -->
+    <footer class="bg-gray-800 text-gray-400 text-center py-4 text-xs mt-auto">
+        <p>Saigon Travel App • Powered by Google Sheets & GitHub Pages</p>
+    </footer>
+
+    <!-- JavaScript 邏輯 -->
+    <script>
+        const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSDD_1kV87iLrQrjxNVFsjyXmPMhx_H6TxVPY2HXC8yHwIFEQj2Pa8y51LGKpN-hyaZaU3ilgEZ0z3d/pub?gid=882854848&single=true&output=csv";
+        let rawData = [];
+
+        // 頁籤切換
+        function switchTab(tabName) {
+            const formPage = document.getElementById('page-form');
+            const overviewPage = document.getElementById('page-overview');
+            const tabForm = document.getElementById('tab-form');
+            const tabOverview = document.getElementById('tab-overview');
+
+            if (tabName === 'form') {
+                formPage.classList.remove('hidden');
+                overviewPage.classList.add('hidden');
+                tabForm.classList.add('tab-active');
+                tabOverview.classList.remove('tab-active');
+            } else {
+                formPage.classList.add('hidden');
+                overviewPage.classList.remove('hidden');
+                tabOverview.classList.add('tab-active');
+                tabForm.classList.remove('tab-active');
+                if (rawData.length === 0) {
+                    fetchSheetData();
+                }
+            }
+        }
+
+        // 解析 CSV 格式 (支援引號內含逗號)
+        function parseCSV(text) {
+            let lines = text.split("\n");
+            let result = [];
+            for (let i = 1; i < lines.length; i++) {
+                let line = lines[i].trim();
+                if (!line) continue;
+                let row = [];
+                let insideQuote = false;
+                let entry = "";
+                for (let char of line) {
+                    if (char === '"') {
+                        insideQuote = !insideQuote;
+                    } else if (char === ',' && !insideQuote) {
+                        row.push(entry.trim());
+                        entry = "";
+                    } else {
+                        entry += char;
+                    }
+                }
+                row.push(entry.trim());
+                result.push(row);
+            }
+            return result;
+        }
+
+        // 抓取試算表資料
+        async function fetchSheetData(isManual = false) {
+            const syncBtn = document.getElementById('sync-btn');
+            const syncIcon = document.getElementById('sync-icon');
+            const syncText = document.getElementById('sync-text');
+            const syncTimeLabel = document.getElementById('sync-time-label');
+
+            syncBtn.disabled = true;
+            syncIcon.classList.add('animate-spin');
+            syncText.textContent = "同步中...";
+
+            try {
+                const response = await fetch(CSV_URL + "&t=" + new Date().getTime());
+                const csvText = await response.text();
+                const parsed = parseCSV(csvText);
+
+                rawData = parsed.map(row => ({
+                    timestamp: row[0] || '',
+                    vnd: row[1] || '0',
+                    twd: row[2] || '0',
+                    category: row[3] || '未分類',
+                    description: row[4] || '',
+                    card: row[5] || '',
+                    payer: row[6] || '未填寫',
+                    debtor: row[7] || '未填寫'
+                }));
+
+                populateDropdowns();
+                filterAndRender();
+
+                const now = new Date();
+                syncTimeLabel.textContent = `最後同步時間：${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+                
+                if (isManual) {
+                    alert("✅ 試算表資料已強制同步成功！");
+                }
+            } catch (error) {
+                console.error("同步失敗:", error);
+                alert("❌ 同步失敗，請檢查網路連線或稍後再試。");
+            } finally {
+                syncBtn.disabled = false;
+                syncIcon.classList.remove('animate-spin');
+                syncText.textContent = "同步試算表";
+            }
+        }
+
+        // 填入下拉選單選項
+        function populateDropdowns() {
+            const categories = [...new Set(rawData.map(item => item.category))].filter(Boolean);
+            const debtors = [...new Set(rawData.map(item => item.debtor))].filter(Boolean);
+
+            const catSelect = document.getElementById('filter-category');
+            const debtorSelect = document.getElementById('filter-debtor');
+
+            let currentCat = catSelect.value;
+            let currentDebtor = debtorSelect.value;
+
+            catSelect.innerHTML = `<option value="ALL">全選類別 (All Categories)</option>` + 
+                categories.nameMap(c => `<option value="${c}">${c}</option>`).join('');
+            debtorSelect.innerHTML = `<option value="ALL">全選應付者 (All Payers)</option>` + 
+                debtors.map(d => `<option value="${d}">${d}</option>`).join('');
+
+            if (categories.includes(currentCat)) catSelect.value = currentCat;
+            if (debtors.includes(currentDebtor)) debtorSelect.value = currentDebtor;
+        }
+
+        // 金額格式化
+        function formatNumber(numStr) {
+            const num = parseFloat(numStr.replace(/[^0-9.-]+/g,"")) || 0;
+            return num.toLocaleString();
+        }
+
+        // 篩選與渲染表格
+        function filterAndRender() {
+            const selectedCategory = document.getElementById('filter-category').value;
+            const selectedDebtor = document.getElementById('filter-debtor').value;
+
+            let filtered = rawData.filter(item => {
+                let matchCat = (selectedCategory === 'ALL' || item.category === selectedCategory);
+                let matchDebtor = (selectedDebtor === 'ALL' || item.debtor === selectedDebtor);
+                return matchCat && matchDebtor;
+            });
+
+            let totalVND = 0;
+            let totalTWD = 0;
+
+            rawData.forEach(item => {
+                totalVND += parseFloat(item.vnd.replace(/[^0-9.-]+/g,"")) || 0;
+                totalTWD += parseFloat(item.twd.replace(/[^0-9.-]+/g,"")) || 0;
+            });
+
+            let filteredVND = 0;
+            let filteredTWD = 0;
+
+            filtered.forEach(item => {
+                filteredVND += parseFloat(item.vnd.replace(/[^0-9.-]+/g,"")) || 0;
+                filteredTWD += parseFloat(item.twd.replace(/[^0-9.-]+/g,"")) || 0;
+            });
+
+            document.getElementById('total-vnd').textContent = `VND ${formatNumber(totalVND.toString())}`;
+            document.getElementById('total-twd').textContent = `NT$ ${formatNumber(totalTWD.toString())}`;
+            document.getElementById('total-count').textContent = `${rawData.length} 筆`;
+            document.getElementById('filtered-total').textContent = `VND ${formatNumber(filteredVND.toString())} (NT$ ${formatNumber(filteredTWD.toString())})`;
+
+            const tbody = document.getElementById('table-body');
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" class="p-6 text-center text-gray-400">沒有找到符合條件的記帳資料</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = filtered.map(item => `
+                <tr class="hover:bg-gray-50 transition">
+                    <td class="p-3 text-gray-500 whitespace-nowrap">${item.timestamp}</td>
+                    <td class="p-3 font-semibold text-emerald-800 whitespace-nowrap">₫ ${formatNumber(item.vnd)}</td>
+                    <td class="p-3 text-gray-700 whitespace-nowrap">$ ${formatNumber(item.twd)}</td>
+                    <td class="p-3"><span class="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full text-xs font-medium">${item.category}</span></td>
+                    <td class="p-3 text-gray-800 max-w-xs truncate" title="${item.description}">${item.description}</td>
+                    <td class="p-3 text-gray-500">${item.card}</td>
+                    <td class="p-3 text-gray-700 font-medium">${item.payer}</td>
+                    <td class="p-3 text-indigo-700 font-bold">${item.debtor}</td>
+                </tr>
+            `).join('');
+        }
+
+        window.onload = function() {
+            fetchSheetData();
+        };
+    </script>
+</body>
+</html>
